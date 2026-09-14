@@ -1,0 +1,34 @@
+[
+    {
+        "title": "E-VIVLIO",
+        "description": "A collaborative e-reading ecosystem. Shared shelves, shared notes, shared pages — readers stay in sync and in conversation around the same book, so reading stops being a solo act.",
+        "link": "https://github.com/medusa-was-innocent",
+        "background": "/projects/sprunk/background.jpg",
+        "mobile_pic": "/projects/sprunk/web.png",
+        "desktop_pic": "/projects/sprunk/template.jpg"
+    },
+    {
+        "title": "YARD",
+        "description": "Free, ad-free music with real-time listening sync (beta). Open a room, press play, and everyone hears the same second of the same song together — sync over WebSockets, playback over Web Audio.",
+        "link": "https://github.com/medusa-was-innocent",
+        "background": "/projects/find-your-tribe/background.jpg",
+        "mobile_pic": "/projects/find-your-tribe/map.png",
+        "desktop_pic": "/projects/find-your-tribe/irl.jpg"
+    },
+    {
+        "title": "COVE",
+        "description": "No account, no download, no friction — just a room code. Real-time voice chat and screen sharing straight in the browser, built on WebRTC.",
+        "link": "https://github.com/medusa-was-innocent",
+        "background": "/projects/sea-cracker/background.jpg",
+        "mobile_pic": "/projects/sea-cracker/answer.png",
+        "desktop_pic": "/projects/sea-cracker/question.jpg"
+    },
+    {
+        "title": "THIS PORTFOLIO",
+        "description": "The site you're reading. Adapted from Cyprien Jaquier's open-source Vue portfolio, then rewritten, re-skinned and extended by me — the lab where my WebGL, Web Audio and WebSockets experiments eventually ship.",
+        "link": "https://github.com/medusa-was-innocent",
+        "background": "/optimized/backgrounds/mountains.webp",
+        "mobile_pic": "/projects/portfolio/contact.png",
+        "desktop_pic": "/projects/portfolio/home.jpg"
+    }
+]

@@ -1,0 +1,23 @@
+[
+    {
+        "image": "/about/kid.png",
+        "when": "THE DICTIONARY YEARS",
+        "description": "Long before I knew the word \"GPS\" existed, I wanted to know exactly where my father was. He was out of station, on his way home, and my child-brain had decided that his location must be something you could look up. I knew one book that contained every unknown word: the dictionary. So I seriously asked my mother to search for his location in it. She laughed and called me Suppandi — the Tinkle character famous for perfectly literal, perfectly wrong logic. The nickname faded. The curiosity that earned it never did.",
+        "from": "2004",
+        "to": "2017"
+    },
+    {
+        "image": "/about/teen.png",
+        "when": "THE LONG DETOUR",
+        "description": "Then came years away from technology. I prepared for JEE Mains, took a drop year to try again, and didn't make it. I won't dress that up as a victory — it was a failure, and it was lonely. But somewhere in that quiet I learned a distinction I still use today: isolation is something that happens to you, solitude is something you build. I rebuilt myself in that solitude — slower, calmer, and certain that the curious kid with the dictionary was still in there, waiting for a terminal.",
+        "from": "2017",
+        "to": "2023"
+    },
+    {
+        "image": "/about/adult.png",
+        "when": "TODAY",
+        "description": "Today I study Computer Science with a specialization in AI & ML, finally giving that old curiosity a proper toolbox. I build small projects on purpose — e-vivlio, Yard, Cove, this portfolio — because shipping is how I think. Yard taught me WebSockets and Web Audio by making strangers hear the same song at the same second; Cove taught me WebRTC by turning a room code into a voice call with screen share, no login required. At night I fall down browser rabbit holes: WebGL, Web Audio, WebSockets, and whatever the spec drafts next. I'm planning higher studies in AI/ML, and I'm actively looking for hard problems and good collaborators. If that sounds like something you're building, my inbox is one scroll away.",
+        "from": "2024",
+        "to": "Today"
+    }
+]

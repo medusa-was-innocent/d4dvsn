@@ -1,0 +1,17 @@
+[
+    {
+        "title": "THE SUPPANDI PRIZE, AWARDED BY MY MOTHER",
+        "description": "For outstandingly literal research methods: attempting to locate a moving human being using a printed dictionary. The first recorded case of me asking the wrong tool the right question — a mistake I have been carefully repeating in engineering ever since.",
+        "date": "2017"
+    },
+    {
+        "title": "THE YEAR SOLITUDE BECAME A TOOL",
+        "description": "After a drop year and a JEE result that didn't go my way, I learned to convert isolation into solitude: a quiet, structured space to think, reset, and finally choose computer science on purpose instead of by default.",
+        "date": "2023"
+    },
+    {
+        "title": "FIRST COMMIT, SECOND START",
+        "description": "The year I began my B.Tech in CSE (AI & ML) and started shipping for real: e-vivlio for readers, Yard for shared listening, Cove for login-free calls — three projects that turned \"how does this work?\" into \"watch me build it.\"",
+        "date": "2024"
+    }
+]

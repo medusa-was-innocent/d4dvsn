@@ -1,0 +1,32 @@
+{
+    "Hire me": [
+        {
+            "text": "meiteidevson6@gmail.com",
+            "href": "mailto:meiteidevson6@gmail.com"
+        }
+    ],
+    "Social": [
+        {
+            "text": "LinkedIn",
+            "href": "https://www.linkedin.com/in/devson-meitei-50b1a5388/",
+            "target": "_blank"
+        },
+        {
+            "text": "Bluesky",
+            "href": "https://bsky.app/profile/d4dvsn.bsky.social",
+            "target": "_blank"
+        },
+        {
+            "text": "Mastodon",
+            "href": "https://mastodon.social/@dvsn",
+            "target": "_blank"
+        }
+    ],
+    "Open source": [
+        {
+            "text": "GitHub",
+            "href": "https://github.com/medusa-was-innocent",
+            "target": "_blank"
+        }
+    ]
+}

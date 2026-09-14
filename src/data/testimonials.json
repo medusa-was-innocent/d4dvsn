@@ -1,0 +1,17 @@
+[
+    {
+        "writer_image": "/testimonials/man-1.jpg",
+        "writer_position": "01 · ON CURIOSITY",
+        "description": "The question that sounds silly at seven is often the research question at twenty. I still keep a list of my \"dictionary questions\" — AI & ML is simply where I finally get to answer them."
+    },
+    {
+        "writer_image": "/testimonials/man-2.jpg",
+        "writer_position": "02 · ON SOLITUDE",
+        "description": "A drop year taught me that isolation happens to you, but solitude is something you build. Deep work, hard proofs and 2 a.m. debugging all require the second kind."
+    },
+    {
+        "writer_image": "/testimonials/man-3.jpg",
+        "writer_position": "03 · ON SHIPPING",
+        "description": "I build small things constantly — a reading app, a shared-listening room, a login-free call tool, this site — because one shipped project teaches you what ten tutorials can't: what breaks, what scales, and what people actually do."
+    }
+]
