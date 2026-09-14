@@ -1,8 +1,6 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-
-// Optional same-origin search service. Audiomack consumer secrets must stay on a server.
-const props = defineProps({ searchEndpoint: { type: String, default: '' } });
+import { searchTracks, parseAudiomackLink, PAGE_SIZE } from '@/services/musicCatalog';
 
 const card = ref(null);
 const audio = ref(null);
@@ -17,6 +15,12 @@ const results = ref([]);
 const library = ref([]);
 const selected = ref(null);
 const embedded = ref(null);
+const searchReady = ref(false);
+const checkingSearch = ref(true);
+const isSongLink = computed(() => Boolean(parseAudiomackLink(query.value.trim())));
+const hasMore = ref(false);
+const searchedQuery = ref('');
+let resultOffset = 0;
 const playing = ref(false);
 const busy = ref(false);
 const elapsed = ref(0);
@@ -36,8 +40,6 @@ const cardStyle = computed(() => position.value
   ? { left: `${position.value.x}px`, top: `${position.value.y}px`, right: 'auto', bottom: 'auto' }
   : {});
 const currentTitle = computed(() => embedded.value?.title || selected.value?.title || 'A little music?');
-const searchHref = computed(() => `https://audiomack.com/search?q=${encodeURIComponent(query.value.trim())}`);
-const looksLikeLink = computed(() => /^(https?:\/\/|(?:www\.)?audiomack\.com\/)/i.test(query.value.trim()));
 const filteredLibrary = computed(() => library.value.filter(track => track.title.toLowerCase().includes(query.value.trim().toLowerCase())));
 const playLabel = computed(() => {
   if (embedded.value) return 'Open Audiomack playback controls';
@@ -135,7 +137,8 @@ function stopLocalAudio() {
 }
 
 async function togglePlayback() {
-  if (embedded.value || !selected.value) return toggleExpanded(true);
+  if (embedded.value) return toggleExpanded(true);
+  if (!selected.value) return toggleExpanded(true);
   if (!audio.value.paused) return stopLocalAudio();
   const attempt = ++playAttempt;
   busy.value = true;
@@ -148,21 +151,22 @@ async function togglePlayback() {
     busy.value = false;
     notice.value = error.name === 'NotAllowedError'
       ? 'Tap play again to let your browser start the music.'
-      : 'This audio could not play. Try another file.';
+      : 'This track could not play. Please choose another result.';
   }
 }
 
-async function selectLocal(track) {
+async function selectLocal(track, startPlaying = false) {
   stopLocalAudio();
   embedded.value = null;
   selected.value = track;
   elapsed.value = 0;
   duration.value = 0;
-  notice.value = 'Ready when you are. Tap the line to play.';
+  notice.value = startPlaying ? '' : 'Ready when you are. Tap the line to play.';
   await nextTick();
   audio.value.volume = Number(volume.value);
   audio.value.load();
   keepInView();
+  if (startPlaying) await togglePlayback();
 }
 
 function chooseFiles(event) {
@@ -178,72 +182,57 @@ function chooseFiles(event) {
   event.target.value = '';
 }
 
-function parseAudiomackLink(value) {
-  try {
-    const url = new URL(/^https?:\/\//i.test(value) ? value : `https://${value}`);
-    if (!['audiomack.com', 'www.audiomack.com'].includes(url.hostname) || !['https:', 'http:'].includes(url.protocol) || url.username || url.password) return null;
-    const parts = url.pathname.split('/').filter(Boolean);
-    if (parts[0] === 'embed') parts.shift();
-    if (parts.length !== 3) return null;
-    // Accept current /artist/song/title and earlier /song/artist/title share links.
-    const types = ['song', 'album', 'playlist'];
-    const [artist, type, slug] = types.includes(parts[0]) ? [parts[1], parts[0], parts[2]] : parts;
-    if (!types.includes(type) || !artist || !slug) return null;
-    const path = [artist, type, slug].join('/');
-    return {
-      title: decodeURIComponent(slug).replace(/-/g, ' '),
-      url: `https://audiomack.com/${path}`,
-      embedUrl: `https://audiomack.com/embed/${path}`,
-      type,
-    };
-  } catch { return null; }
-}
-
-function loadAudiomack(value = query.value) {
-  const track = parseAudiomackLink(value.trim());
-  if (!track) {
-    notice.value = 'Paste an Audiomack song, album or playlist link.';
-    return;
-  }
-  stopLocalAudio();
-  selected.value = null;
-  embedded.value = track;
-  notice.value = '';
-  results.value = [];
-  toggleExpanded(true);
-}
-
-async function searchCatalog() {
-  if (looksLikeLink.value) return loadAudiomack();
+async function searchCatalog(more = false) {
   if (!query.value.trim()) return;
-  if (!props.searchEndpoint) {
-    window.open(searchHref.value, '_blank', 'noopener,noreferrer');
-    return;
-  }
-  // A deployment may supply a server route returning { results: [{ title, artist, url }] }.
-  // Never call the signed Audiomack Data API directly from the browser.
+  const link = parseAudiomackLink(query.value.trim());
+  if (link) return selectAudiomack(link);
+  more = more === true && searchedQuery.value === query.value.trim();
   requestController?.abort();
   const controller = new AbortController();
   requestController = controller;
+  const timeout = window.setTimeout(() => controller.abort('timeout'), 15000);
   searching.value = true;
   notice.value = '';
-  results.value = [];
+  if (!more) {
+    results.value = [];
+    resultOffset = 0;
+    hasMore.value = false;
+  }
+  const term = query.value.trim();
   try {
-    const endpoint = new URL(props.searchEndpoint, window.location.origin);
-    if (endpoint.origin !== window.location.origin) throw new Error('Use a same-origin music search service.');
-    endpoint.searchParams.set('q', query.value.trim());
-    const response = await fetch(endpoint, { signal: controller.signal });
-    if (!response.ok) throw new Error('Audiomack search is unavailable. Use “Find on Audiomack” below.');
-    const data = await response.json();
+    const data = await searchTracks(term, { offset: resultOffset, signal: controller.signal });
     if (requestController !== controller) return;
-    results.value = (Array.isArray(data.results) ? data.results : []).filter(track => typeof track.url === 'string' && parseAudiomackLink(track.url)).slice(0, 12);
-    if (!results.value.length) notice.value = 'No songs found. Try another artist or title.';
+    results.value = [...new Map([...results.value, ...data.tracks].map(track => [track.id, track])).values()];
+    searchedQuery.value = term;
+    resultOffset += PAGE_SIZE;
+    hasMore.value = data.hasMore;
+    if (!results.value.length) notice.value = 'No matching songs from verified Audiomack uploaders. Try another title or artist.';
   } catch (error) {
-    if (error.name !== 'AbortError') notice.value = error.message;
+    if (requestController === controller) notice.value = controller.signal.reason === 'timeout' ? 'Search took too long. Please try again.' : error.name === 'AbortError' ? '' : error.message;
   } finally {
+    window.clearTimeout(timeout);
     if (requestController === controller) searching.value = false;
   }
 }
+
+function selectAudiomack(track) {
+  const link = parseAudiomackLink(track.url);
+  if (!link) return;
+  stopLocalAudio();
+  selected.value = null;
+  embedded.value = { ...track, ...link, title: track.title, artist: track.artist || link.artist };
+  notice.value = '';
+  nextTick(keepInView);
+}
+
+watch(query, () => {
+  requestController?.abort();
+  requestController = null;
+  searching.value = false;
+  hasMore.value = false;
+  results.value = [];
+  notice.value = '';
+}, { flush: 'sync' });
 
 function clearMusic() {
   stopLocalAudio();
@@ -260,6 +249,11 @@ function timeLabel(seconds) {
 }
 
 onMounted(() => {
+  fetch('/api/music/status', { signal: AbortSignal.timeout(5000) })
+    .then(response => response.ok ? response.json() : null)
+    .then(data => { searchReady.value = data?.configured === true; })
+    .catch(() => { searchReady.value = false; })
+    .finally(() => { checkingSearch.value = false; });
   motionPreference = window.matchMedia('(prefers-reduced-motion: reduce)');
   motionPreference.addEventListener('change', syncWave);
   resizeObserver = new ResizeObserver(keepInView);
@@ -283,7 +277,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <aside ref="card" class="music-card" :class="{ 'is-expanded': expanded, 'is-dragging': dragging }" :style="cardStyle" aria-label="Music player" @keydown.esc="toggleExpanded(false)">
+  <aside ref="card" class="music-card glass-panel" :class="{ 'is-expanded': expanded, 'is-dragging': dragging }" :style="cardStyle" aria-label="Music player" @keydown.esc="toggleExpanded(false)">
     <div class="music-toolbar">
       <button class="wave-button" type="button" :aria-label="playLabel" :aria-pressed="selected ? playing : undefined" :aria-busy="busy" @click="togglePlayback">
         <svg viewBox="0 0 60 24" width="60" height="24" aria-hidden="true"><path :d="wave" /></svg>
@@ -299,26 +293,34 @@ onBeforeUnmount(() => {
 
     <div v-show="expanded" id="music-panel" class="music-panel" @wheel.stop @touchmove.stop>
       <div class="track-heading"><p>{{ currentTitle }}</p><button v-if="selected || embedded" class="text-button" type="button" @click="clearMusic">Clear</button></div>
-      <p class="music-caption" v-if="!selected && !embedded">Set the mood while you explore.</p>
-      <form class="music-search" @submit.prevent="searchCatalog">
-        <label class="sr-only" for="music-search-input">Find music or paste an Audiomack link</label>
-        <input ref="searchInput" id="music-search-input" v-model="query" type="search" placeholder="Artist, song or Audiomack link" autocomplete="off" maxlength="1000" />
-        <button v-if="looksLikeLink || props.searchEndpoint" class="search-action" type="submit" :disabled="searching || !query.trim()">{{ looksLikeLink ? 'Load' : searching ? '…' : 'Search' }}</button>
-        <a v-else class="search-action" :href="searchHref" target="_blank" rel="noopener noreferrer" aria-label="Find music on Audiomack, opens in a new tab">Find ↗</a>
+      <p class="music-caption">{{ embedded?.artist || selected?.artist || 'Audiomack · Your choice of music' }}</p>
+      <form class="music-search" role="search" @submit.prevent="searchCatalog()">
+        <label class="sr-only" for="music-search-input">Search Audiomack or open a song link</label>
+        <input ref="searchInput" id="music-search-input" v-model="query" type="search" :placeholder="searchReady ? 'Search songs or artists…' : 'Audiomack song link'" autocomplete="off" maxlength="1000" />
+        <button class="search-action" type="submit" :disabled="searching || !query.trim() || (!searchReady && !isSongLink)">{{ searching ? '…' : isSongLink ? 'Open' : 'Search' }}</button>
       </form>
-      <p v-if="!props.searchEndpoint" class="music-hint">Find a track on Audiomack, then paste its share link here.</p>
+      <p v-if="checkingSearch" class="music-hint">Checking Audiomack connection…</p>
+      <p v-else-if="!searchReady" class="music-hint" role="status">Audiomack search isn’t connected yet: it requires the owner’s application credentials. Song links can still open in the player below.</p>
+      <p v-else class="music-hint">Audiomack songs · verified uploaders only.</p>
       <p v-if="notice" class="music-notice" role="status">{{ notice }}</p>
-
-      <ul v-if="results.length" class="music-results" aria-label="Audiomack search results">
-        <li v-for="track in results" :key="track.url"><button type="button" @click="loadAudiomack(track.url)"><span>{{ track.title }}</span><small>{{ track.artist }}</small></button></li>
+      <p class="sr-only" role="status">{{ searching ? 'Searching music' : results.length ? `${results.length} playable results` : '' }}</p>
+      <ul v-if="results.length" class="music-results" aria-label="Audiomack search results" :aria-busy="searching">
+        <li v-for="track in results" :key="track.id"><button class="catalog-result" type="button" :aria-label="`Open ${track.title} by ${track.artist}`" :aria-pressed="embedded?.url === track.url" @click="selectAudiomack(track)">
+          <img v-if="track.artwork" :src="track.artwork" alt="" width="40" height="40" loading="lazy" referrerpolicy="no-referrer" />
+          <span v-else class="artwork-placeholder" aria-hidden="true">♪</span>
+          <span class="result-copy"><span>{{ track.title }}</span><small>{{ track.artist }}</small></span>
+          <span class="result-play" aria-hidden="true">▶</span>
+        </button></li>
       </ul>
+      <button v-if="hasMore" class="more-results" type="button" :disabled="searching" @click="searchCatalog(true)">{{ searching ? 'Loading…' : 'Show more results' }}</button>
 
-      <div v-if="embedded" class="audiomack-embed">
-        <iframe :key="embedded.embedUrl" :src="embedded.embedUrl" :title="`Audiomack player: ${embedded.title}`" :height="embedded.type === 'song' ? 252 : 352" width="100%" scrolling="no" referrerpolicy="strict-origin-when-cross-origin" allow="encrypted-media" />
-        <p class="music-hint">Play and pause with the Audiomack controls. <a :href="embedded.url" target="_blank" rel="noopener noreferrer">Open track ↗</a></p>
+      <div v-if="embedded" class="audiomack-player">
+        <iframe :key="embedded.embedUrl" :src="embedded.embedUrl" :title="`Audiomack: ${embedded.title}`" :height="embedded.type === 'song' ? 252 : 352" width="100%" scrolling="no" allow="autoplay; encrypted-media" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+        <p class="music-hint">Play and pause with Audiomack’s controls. <a :href="embedded.url" target="_blank" rel="noopener noreferrer">Open song ↗</a></p>
       </div>
 
       <div v-if="selected" class="local-controls">
+        <div class="now-playing"><button type="button" class="play-control" :aria-label="playLabel" @click="togglePlayback">{{ busy ? 'Loading…' : playing ? 'Pause' : 'Play' }}</button><span>On your device</span></div>
         <div class="progress-labels"><span>{{ timeLabel(elapsed) }}</span><span>{{ timeLabel(duration) }}</span></div>
         <input class="seek-control" type="range" aria-label="Playback position" min="0" :max="duration || 1" step="0.1" :value="elapsed" :disabled="!duration" @input="audio.currentTime = Number($event.target.value)" />
         <div class="volume-controls"><span>Volume</span><input v-model="volume" aria-label="Music volume" type="range" min="0" max="1" step="0.01" /></div>
@@ -327,11 +329,11 @@ onBeforeUnmount(() => {
       <ul v-if="filteredLibrary.length" class="music-results local-library" aria-label="Your music files">
         <li v-for="track in filteredLibrary" :key="track.url"><button type="button" :aria-pressed="selected?.url === track.url" @click="selectLocal(track)"><span>{{ track.title }}</span><small>{{ selected?.url === track.url ? 'Selected' : 'From your device' }}</small></button></li>
       </ul>
-      <div class="music-footer"><button class="text-button" type="button" @click="filePicker.click()">Choose from device</button><a :href="searchHref" target="_blank" rel="noopener noreferrer">Find on Audiomack ↗</a></div>
+      <div class="music-footer"><button class="text-button" type="button" @click="filePicker.click()">Choose from device</button><a href="https://audiomack.com" target="_blank" rel="noopener noreferrer">Audiomack ↗</a></div>
       <input ref="filePicker" class="sr-only" type="file" accept="audio/*,.mp3,.m4a,.aac,.ogg,.wav,.flac,.opus" multiple tabindex="-1" aria-label="Choose local music files" @change="chooseFiles" />
     </div>
 
-    <audio ref="audio" :src="selected?.url" preload="metadata" @playing="playing = true; busy = false" @pause="playing = false; busy = false" @waiting="playing = false; busy = true" @ended="playing = false; busy = false" @timeupdate="elapsed = audio.currentTime" @loadedmetadata="duration = Number.isFinite(audio.duration) ? audio.duration : 0" @error="playing = false; busy = false; notice = selected ? 'This audio could not play. Try another file.' : ''" />
+    <audio ref="audio" :src="selected?.url" preload="none" @playing="playing = true; busy = false" @pause="playing = false; busy = false" @waiting="playing = false; busy = true" @ended="playing = false; busy = false" @timeupdate="elapsed = audio.currentTime" @loadedmetadata="duration = Number.isFinite(audio.duration) ? audio.duration : 0" @error="playing = false; busy = false; notice = selected ? 'This track is unavailable. Please choose another result or a device file.' : ''" />
   </aside>
 </template>
 
@@ -346,23 +348,20 @@ onBeforeUnmount(() => {
   max-height: calc(100dvh - 24px);
   color: #fffaf0;
   font: 13px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: linear-gradient(130deg, rgb(47 40 39 / 83%), rgb(25 24 31 / 87%));
-  border: 1px solid rgb(255 255 255 / 29%);
+  --glass-tint: rgb(27 33 40 / 32%);
+  --glass-solid: #343b44;
   border-radius: 26px;
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 15%), 0 12px 40px rgb(0 0 0 / 22%);
-  -webkit-backdrop-filter: blur(22px) saturate(145%);
-  backdrop-filter: blur(22px) saturate(145%);
   isolation: isolate;
   overflow: hidden;
 }
-.music-card.is-expanded { width: 344px; border-radius: 24px; }
+.music-card.is-expanded { width: 360px; border-radius: 28px; --glass-tint: rgb(25 32 39 / 55%); }
 .music-card.is-dragging { user-select: none; box-shadow: 0 18px 50px rgb(0 0 0 / 32%); }
 .music-toolbar { display: flex; align-items: center; gap: 2px; padding: 5px; }
 .music-card button, .music-card a, .music-card input { -webkit-tap-highlight-color: transparent; }
 .music-card button, .music-card a { color: inherit; }
 .music-card button { cursor: pointer; }
 .music-card button:focus-visible, .music-card a:focus-visible, .music-card input:focus-visible { outline: 2px solid #eab98c; outline-offset: 3px; }
-.wave-button { height: 42px; width: 78px; display: grid; place-items: center; flex-shrink: 0; border-radius: 22px; background: rgb(255 255 255 / 6%); }
+.wave-button { height: 42px; width: 78px; display: grid; place-items: center; flex-shrink: 0; border-radius: 22px; background: linear-gradient(150deg, #ffffff35, #ffffff0a); box-shadow: inset 0 1px 1px #ffffff75, inset 0 -1px 1px #ffffff20; }
 .wave-button:hover, .icon-button:hover { background: rgb(255 255 255 / 15%); }
 .wave-button svg { display: block; }
 .wave-button path { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -384,13 +383,23 @@ onBeforeUnmount(() => {
 .music-hint { font-size: 11px; line-height: 1.55; color: #c8c1bd; margin: 8px 0 0; }
 .music-hint a { text-decoration: underline; text-underline-offset: 3px; }
 .music-notice { font-size: 12px; color: #eed0b3; margin: 11px 0; }
-.music-results { list-style: none; padding: 0; margin: 12px 0; max-height: 190px; overflow-y: auto; overscroll-behavior: contain; }
+.music-results { list-style: none; padding: 0; margin: 12px 0; max-height: min(260px, 32dvh); overflow-y: auto; overscroll-behavior: contain; }
 .music-results button { text-align: left; width: 100%; padding: 9px 10px; border-radius: 10px; }
 .music-results button:hover, .music-results button[aria-pressed='true'] { background: rgb(255 255 255 / 9%); }
 .music-results span, .music-results small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .music-results small { color: #bfb6b1; font-size: 10px; margin-top: 1px; }
-.audiomack-embed { margin-top: 15px; }
-.audiomack-embed iframe { display: block; width: 100%; border: 0; border-radius: 12px; background: #fff; }
+.catalog-result { display: flex; align-items: center; gap: 10px; }
+.catalog-result img, .artwork-placeholder { width: 40px; height: 40px; border-radius: 9px; object-fit: cover; flex-shrink: 0; background: #ffffff18; }
+.artwork-placeholder { text-align: center; padding-top: 9px; }
+.result-copy { min-width: 0; flex: 1; }
+.result-play { font-size: 11px; padding: 4px; opacity: .85; }
+.more-results, .play-control { padding: 7px 12px; border: 1px solid #ffffff35; border-radius: 999px; background: linear-gradient(160deg, #ffffff26, #ffffff08); font-size: 11px; }
+.audiomack-player { margin-top: 16px; }
+.audiomack-player iframe { display: block; width: 100%; border: 0; border-radius: 14px; background: #161616; }
+.more-results { display: block; margin: 0 auto; }
+.more-results:disabled { opacity: .5; }
+.now-playing { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; font-size: 10px; }
+.play-control { min-width: 70px; }
 .local-controls { margin-top: 19px; }
 .progress-labels { display: flex; justify-content: space-between; color: #c5bcb6; font-size: 10px; font-variant-numeric: tabular-nums; }
 .seek-control { width: 100%; accent-color: #e5bf9a; height: 24px; cursor: pointer; }

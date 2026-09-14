@@ -89,7 +89,7 @@ onBeforeUnmount(() => {
 .principles-scene { position: sticky; top: 3dvw; width: 100%; height: calc(100dvh - 6dvw); min-height: 440px; display: grid; place-items: center; border-radius: 32px; isolation: isolate; overflow: hidden; background: #aab8bf; }
 .principles-art { position: absolute; inset: 0; z-index: -1; overflow: hidden; }
 .principles-art :deep(img) { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; }
-.principles-glass { width: min(76%, 820px); border-radius: 38px; padding: 12px 20px 20px; --glass-tint: rgba(255, 255, 255, .67); color: #17242c; transition: box-shadow .25s; }
+.principles-glass { width: min(76%, 820px); border-radius: 38px; padding: 12px 20px 20px; --glass-tint: rgba(255, 255, 255, .48); color: #17242c; transition: box-shadow .25s; }
 .principles-glass:hover { box-shadow: inset 0 1px 0 #ffffffdc, 0 18px 50px #10263824; }
 .principles-window { overflow: hidden; perspective: 1100px; }
 .principles-window :deep(.testimonial-item) { backface-visibility: hidden; transform-origin: center; }

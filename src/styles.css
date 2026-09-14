@@ -1,0 +1,46 @@
+@import url('https://fonts.googleapis.com/css2?family=Rubik+Mono+One&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Ledger&display=swap');
+
+@import "tailwindcss";
+
+@theme {
+  --font-rubik: "Rubik Mono One", monospace;
+  --font-ledger: "Ledger", serif;
+  --color-red-custom: #DE2E2E;
+}
+
+/* Shared glass, without a displacement filter that can flash while scrolling. */
+.glass-panel {
+  background: linear-gradient(155deg, #ffffff50 0%, #ffffff0a 34%, #ffffff03 65%, #ffffff25 100%), var(--glass-tint, #ffffff70);
+  border: 1px solid #ffffff85;
+  box-shadow: inset 0 2px 2px #ffffffa0, inset 2px 0 3px #ffffff35, inset -1px -2px 3px #00000024, 0 0 0 1px #17212c20, 0 12px 36px #0e182b26;
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+  backdrop-filter: blur(22px) saturate(170%);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass-panel { background: var(--glass-solid, #e7e9eb); backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+
+:is(a, button, input):focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+}
+
+@layer utilities {
+  html, body {
+    @apply overflow-x-hidden;
+  }
+
+  .pause {
+    animation-play-state: paused !important;
+  }
+
+  .parallax {
+    pointer-events: none;
+  }
+
+  .filter {
+    @apply before:content-[''] before:absolute before:inset-0 before:shadow-[inset_0_0_8px_1px_rgba(255,255,255,0.3)];
+  }
+}

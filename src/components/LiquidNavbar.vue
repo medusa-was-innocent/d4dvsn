@@ -101,14 +101,14 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.liquid-nav { position: fixed; z-index: 70; top: max(20px, 4dvw); left: 50%; transform: translateX(-50%); border-radius: 999px; color: #fff; padding: 5px; --glass-tint: rgba(32, 40, 43, .36); }
+.liquid-nav { position: fixed; z-index: 70; top: max(20px, 4dvw); left: 50%; transform: translateX(-50%); border-radius: 999px; color: #fff; padding: 6px; --glass-tint: rgba(27, 35, 41, .24); --glass-solid: #4e565c; }
 .desktop-nav { position: relative; display: flex; align-items: center; gap: 2px; }
 .desktop-nav a { position: relative; z-index: 1; display: block; padding: 10px 17px; border-radius: 999px; font-size: 14px; line-height: 1.45; text-shadow: 0 1px 8px #0005; white-space: nowrap; transition: color .2s; }
-.nav-lens { position: absolute; left: 0; top: 0; bottom: 0; border: 1px solid #ffffff65; border-radius: 999px; background: linear-gradient(140deg, #ffffff42, #ffffff0a); box-shadow: inset 0 1px 4px #ffffff70, 0 3px 10px #0000000c; transition: transform .36s cubic-bezier(.22, 1, .36, 1), width .36s cubic-bezier(.22, 1, .36, 1), opacity .2s; pointer-events: none; }
+.nav-lens { position: absolute; left: 0; top: 0; bottom: 0; border: 1px solid #ffffff85; border-radius: 999px; background: linear-gradient(165deg, #ffffff68, #ffffff0a 55%, #ffffff30); box-shadow: inset 0 2px 3px #ffffffa0, inset 0 -1px 3px #ffffff60, 0 3px 12px #00000018; transition: transform .36s cubic-bezier(.22, 1, .36, 1), width .36s cubic-bezier(.22, 1, .36, 1), opacity .2s; pointer-events: none; }
 .mobile-toggle { display: none; align-items: center; justify-content: space-between; gap: 26px; padding: 10px 16px; cursor: pointer; min-width: 166px; }
 .mobile-toggle svg { height: 22px; width: 22px; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
 .menu-backdrop { position: fixed; inset: 0; z-index: 65; background: #08111a45; backdrop-filter: blur(5px); }
-.mobile-menu { position: fixed; z-index: 70; top: 86px; left: 50%; transform: translateX(-50%); width: min(340px, calc(100vw - 32px)); padding: 12px; border-radius: 26px; color: white; --glass-tint: rgba(32, 40, 43, .75); }
+.mobile-menu { position: fixed; z-index: 70; top: 86px; left: 50%; transform: translateX(-50%); width: min(340px, calc(100vw - 32px)); padding: 12px; border-radius: 26px; color: white; --glass-tint: rgba(32, 40, 43, .48); --glass-solid: #343e45; }
 .mobile-menu a { display: flex; align-items: center; justify-content: space-between; border-radius: 16px; padding: 15px 18px; font-size: 18px; }
 .mobile-menu a:is(:hover, :focus-visible, [aria-current="location"]) { background: #ffffff23; }
 .mobile-menu a span { opacity: .6; }

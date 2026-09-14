@@ -32,7 +32,7 @@ onBeforeUnmount(() => component.value?.reset());
                 <div class="contact-background" aria-hidden="true">
                     <img src="/optimized/contact/sky.webp" alt="" class="contact-sky" decoding="async" />
                     <img src="/optimized/contact/mountains.webp" alt="" data-parallax-value=".005" class="parallax contact-mountains" decoding="async" />
-                    <img src="/optimized/contact/tower.webp" alt="" data-parallax-value=".025" class="parallax contact-tower" decoding="async" />
+                    <img src="/optimized/contact/tower.webp" alt="" data-parallax-value=".025" data-parallax-axis="x" class="parallax contact-tower" decoding="async" />
                 </div>
                 <div class="contact-links">
                     <div v-for="(value, key) in contact" :key="key" class="contact-group">
@@ -49,7 +49,7 @@ onBeforeUnmount(() => component.value?.reset());
                 </div>
                 <div class="contact-foreground" :style="{ transform: `translateY(${translationRef}px)` }" aria-hidden="true">
                     <!-- body.png and arm.png were identical replacements, so render the figure once. -->
-                    <img src="/optimized/contact/figure.webp" alt="" data-parallax-value=".15" class="parallax contact-figure" decoding="async" />
+                    <img src="/optimized/contact/figure.webp" alt="" data-parallax-value=".15" data-parallax-axis="x" class="parallax contact-figure" decoding="async" />
                 </div>
             </div>
         </Parallax>

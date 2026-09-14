@@ -1,71 +1,51 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { AnimatedComponent } from '@/services/AnimatedComponent'
-import { useCursorContext } from '@/composables/useCursorContext';
-import { useWindowContext } from '@/composables/useWindowContext';
+import { ref, onMounted, onBeforeUnmount } from 'vue';
+import { AnimatedComponent } from '@/services/AnimatedComponent';
 
-const { getPositions } = useCursorContext();
-const { md } = useWindowContext();
+const rootRef = ref(null);
+let component;
+let items = [];
+let motion;
+let pointer = { x: 0, y: 0 };
+let current = { x: 0, y: 0 };
 
-
-const rootRef = ref();
-const component = ref();
-const parallaxItems = ref([]);
-const autoAnimDegree = ref(0);
-
-const updatePosition = () => {
-
-  const rootRect = rootRef.value.getBoundingClientRect();
-  let cur = getPositions();
-  let relativeCursorX = rootRect.width / 2 + rootRect.left
-  let relativeCursorY = rootRect.height / 2 + rootRect.top
-
-  if (!md.value) {
-    autoAnimDegree.value = (autoAnimDegree.value + 0.005) % 360;
-    const hyp = 300;
-
-    cur.x = hyp * Math.cos(autoAnimDegree.value * 1.5)
-    cur.y = hyp * Math.sin(autoAnimDegree.value)
-    relativeCursorX = 0
-    relativeCursorY = 0
+function move(event) {
+  if (motion?.matches) return;
+  const bounds = rootRef.value.getBoundingClientRect();
+  pointer = {
+    x: Math.max(-1, Math.min(1, (event.clientX - bounds.left) / bounds.width * 2 - 1)),
+    y: Math.max(-1, Math.min(1, (event.clientY - bounds.top) / bounds.height * 2 - 1)),
   };
-
-  parallaxItems.value.forEach(el => {
-    const multiplicator = el.dataset.parallaxValue;
-    let x;
-    let y;
-
-    if (!md.value) {
-      // Linear move
-      x = (cur.x - relativeCursorX) * -multiplicator;
-      y = (cur.y - relativeCursorY) * -multiplicator;
-     
-    } else {
-       // Quadratic move
-      const dx = cur.x - relativeCursorX;
-      const dy = cur.y - relativeCursorY;
-      x = -(dx * multiplicator * 2) / Math.log(Math.abs(dx) + 2);
-      y = -(dy * multiplicator * 2) / Math.log(Math.abs(dy) + 2);
-    }
-
-    el.style.transform = `translateX(${x}px) translateY(${y}px)`;
-  })
 }
-
+function reset() { pointer = { x: 0, y: 0 }; }
+function release(event) { if (event.pointerType !== 'mouse') reset(); }
+function update() {
+  const bounds = rootRef.value.getBoundingClientRect();
+  const target = motion?.matches ? { x: 0, y: 0 } : pointer;
+  current.x += (target.x - current.x) * .12;
+  current.y += (target.y - current.y) * .12;
+  const dx = current.x * Math.min(bounds.width, 1200) / 2;
+  const dy = current.y * Math.min(bounds.height, 900) / 2;
+  items.forEach(el => {
+    const depth = Number(el.dataset.parallaxValue) || 0;
+    const x = -(dx * depth * 2) / Math.log(Math.abs(dx) + 2);
+    const y = el.dataset.parallaxAxis === 'x' ? 0 : -(dy * depth * 2) / Math.log(Math.abs(dy) + 2);
+    el.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+  });
+}
 onMounted(() => {
-  parallaxItems.value = Array.from(rootRef.value.getElementsByClassName("parallax"));
-  component.value = new AnimatedComponent(rootRef.value);
-  component.value.tick = updatePosition;
-  component.value.autoAnimate();
-})
-
-onBeforeUnmount(() => {
-  component.value.reset();
-})
+  items = [...rootRef.value.querySelectorAll('.parallax')];
+  motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  motion.addEventListener('change', reset);
+  component = new AnimatedComponent(rootRef.value);
+  component.tick = update;
+  component.autoAnimate();
+});
+onBeforeUnmount(() => { component?.reset(); motion?.removeEventListener('change', reset); });
 </script>
 
 <template>
-  <div ref="rootRef" class="parallax-wrapper h-full w-full">
+  <div ref="rootRef" class="parallax-wrapper h-full w-full" @pointermove="move" @pointerleave="reset" @pointercancel="reset" @pointerup="release">
     <slot></slot>
   </div>
 </template>

@@ -29,5 +29,5 @@ import TestimonialWriterCard from '@/components/TestimonialWriterCard.vue';
 .mobile-principles { isolation: isolate; background: #aab8bf; }
 .mobile-principles > img { z-index: 0; }
 .mobile-principles > div { position: relative; z-index: 1; }
-.principle-card { color: #17242c; --glass-tint: rgba(255, 255, 255, .76); }
+.principle-card { color: #17242c; --glass-tint: rgba(255, 255, 255, .58); }
 </style>
