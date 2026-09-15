@@ -27,7 +27,6 @@ const updateSection = () => {
     const marker = Math.min(window.innerHeight * .32, 240);
     const active = [...sections.value].reverse().find(section => section.el.getBoundingClientRect().top <= marker);
     currentSection.value = active?.id || sections.value[0]?.id || 'devson';
-    updateIndicator();
     if (window.innerWidth >= 768) menuOpen.value = false;
 };
 const scheduleUpdate = () => {
@@ -52,31 +51,32 @@ const toggleMenu = async () => {
 const onKeydown = (event) => {
     if (event.key === 'Escape' && menuOpen.value) closeMenu(true);
 };
-watch([hoveredSection, sections], () => nextTick(scheduleUpdate));
+watch([hoveredSection, currentSection, sections], () => nextTick(updateIndicator));
+const resizeNavigation = () => { updateIndicator(); scheduleUpdate(); };
 onMounted(async () => {
     await nextTick();
     if (disposed) return;
     scrollContainer = containerRef.value;
     scrollContainer?.addEventListener('scroll', scheduleUpdate, { passive: true });
-    window.addEventListener('resize', scheduleUpdate, { passive: true });
+    window.addEventListener('resize', resizeNavigation, { passive: true });
     window.addEventListener('keydown', onKeydown);
-    resizeObserver = new ResizeObserver(scheduleUpdate);
+    resizeObserver = new ResizeObserver(resizeNavigation);
     if (navRef.value) resizeObserver.observe(navRef.value);
     updateSection();
-    document.fonts?.ready.then(scheduleUpdate);
+    document.fonts?.ready.then(() => { if (!disposed) resizeNavigation(); });
 });
 onBeforeUnmount(() => {
     disposed = true;
     cancelAnimationFrame(animationFrame);
     resizeObserver?.disconnect();
     scrollContainer?.removeEventListener('scroll', scheduleUpdate);
-    window.removeEventListener('resize', scheduleUpdate);
+    window.removeEventListener('resize', resizeNavigation);
     window.removeEventListener('keydown', onKeydown);
 });
 </script>
 
 <template>
-    <nav class="liquid-nav glass-panel" aria-label="Main navigation">
+    <nav class="liquid-nav glass-panel" :class="{ 'on-paper': currentSection === 'projects' }" aria-label="Main navigation">
         <div ref="navRef" class="desktop-nav" @pointerleave="hoveredSection = null" @focusout="hoveredSection = null">
             <span class="nav-lens" :style="indicator" aria-hidden="true"></span>
             <a v-for="section in sections" :key="section.id" :href="`#${section.id}`" :data-section="section.id"
@@ -103,6 +103,8 @@ onBeforeUnmount(() => {
 <style scoped>
 .liquid-nav { position: fixed; z-index: 70; top: max(20px, 4dvw); left: 50%; transform: translateX(-50%); border-radius: 999px; color: #fff; padding: 6px; --glass-tint: rgba(27, 35, 41, .24); --glass-solid: #4e565c; }
 .desktop-nav { position: relative; display: flex; align-items: center; gap: 2px; }
+.liquid-nav.on-paper { color: #24343d; --glass-tint: #cddce259; }
+.on-paper .desktop-nav a { text-shadow: none; }
 .desktop-nav a { position: relative; z-index: 1; display: block; padding: 10px 17px; border-radius: 999px; font-size: 14px; line-height: 1.45; text-shadow: 0 1px 8px #0005; white-space: nowrap; transition: color .2s; }
 .nav-lens { position: absolute; left: 0; top: 0; bottom: 0; border: 1px solid #ffffff85; border-radius: 999px; background: linear-gradient(165deg, #ffffff68, #ffffff0a 55%, #ffffff30); box-shadow: inset 0 2px 3px #ffffffa0, inset 0 -1px 3px #ffffff60, 0 3px 12px #00000018; transition: transform .36s cubic-bezier(.22, 1, .36, 1), width .36s cubic-bezier(.22, 1, .36, 1), opacity .2s; pointer-events: none; }
 .mobile-toggle { display: none; align-items: center; justify-content: space-between; gap: 26px; padding: 10px 16px; cursor: pointer; min-width: 166px; }

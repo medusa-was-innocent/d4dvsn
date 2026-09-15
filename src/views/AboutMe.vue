@@ -3,6 +3,7 @@ import { ref, onMounted, onBeforeUnmount } from 'vue';
 import FramedMainSection from '@/layouts/FramedMainSection.vue';
 import stories from '@/data/about-me.json';
 import { useScrollContext } from '@/composables/useScrollContext';
+import { chapterHold, chapterState } from '@/services/scrollTiming';
 
 const { containerRef } = useScrollContext();
 const track = ref(null);
@@ -17,26 +18,24 @@ let observer;
 let frame = 0;
 let scroller;
 let disposed = false;
+let stickyTop = 0;
 
 function update() {
   frame = 0;
   if (!segments.length || disposed) return;
-  const top = parseFloat(getComputedStyle(scene.value).top) || 0;
-  const distance = Math.max(0, top - track.value.getBoundingClientRect().top);
-  let start = 0;
-  let index = 0;
-  while (index < segments.length - 1 && distance >= start + segments[index].length) start += segments[index++].length;
-  const segment = segments[index];
-  active.value = index;
-  progress.value = Math.min(1, (distance - start) / segment.length);
+  const distance = Math.max(0, stickyTop - track.value.getBoundingClientRect().top);
+  const state = chapterState(segments, distance, active.value);
+  active.value = state.index;
+  progress.value = state.progress;
   // Long phone stories read vertically with the page scroll, before the next slide.
-  pan.value = Math.min(segment.overflow, Math.max(0, distance - start - segment.hold * .35));
+  pan.value = state.pan;
 }
 function schedule() { if (!disposed && !frame) frame = requestAnimationFrame(update); }
 function measure() {
   if (disposed || !scene.value || !storyWindow.value) return;
   const viewport = scroller?.clientHeight || window.innerHeight;
-  const hold = Math.max(340, viewport * .7);
+  const hold = chapterHold(viewport);
+  stickyTop = parseFloat(getComputedStyle(scene.value).top) || 0;
   segments = bodies.value.map(body => {
     const overflow = Math.max(0, body.scrollHeight - storyWindow.value.clientHeight);
     return { overflow, hold, length: hold + overflow };
@@ -102,7 +101,7 @@ onBeforeUnmount(() => {
 .timeline-rail { width: clamp(60px, 12vw, 160px); height: 3px; background: #ffffff35; }
 .timeline-rail span { display: block; height: 100%; background: #fff; transform-origin: left; }
 .story-window { flex: 1; min-height: 0; overflow: hidden; }
-.story-pages { height: 100%; transition: transform .4s cubic-bezier(.22,.65,.3,1); }
+.story-pages { height: 100%; transition: transform .24s cubic-bezier(.22,.65,.3,1); }
 .story-page { height: 100%; overflow: hidden; }
 .story-body { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); align-items: end; gap: 40px; min-height: 100%; padding: 18px 0; }
 .timeline-copy h2 { font-size: clamp(17px, 2vw, 26px); line-height: 1.4; margin-bottom: 20px; }

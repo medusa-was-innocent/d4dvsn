@@ -1,11 +1,11 @@
-import { createHmac, randomBytes } from 'node:crypto';
+import { createHmac, createHash, randomBytes } from 'node:crypto';
 
 const encode = value => encodeURIComponent(value).replace(/[!'()*]/g, char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
 
-export function authorization(url, key, secret, { nonce = randomBytes(16).toString('hex'), timestamp = Math.floor(Date.now() / 1000) } = {}) {
+export function authorization(url, key, secret, { method = 'GET', body = new URLSearchParams(), nonce = randomBytes(16).toString('hex'), timestamp = Math.floor(Date.now() / 1000) } = {}) {
   const oauth = { oauth_consumer_key: key, oauth_nonce: nonce, oauth_signature_method: 'HMAC-SHA1', oauth_timestamp: String(timestamp), oauth_version: '1.0' };
-  const params = [...url.searchParams.entries(), ...Object.entries(oauth)].map(([k, v]) => [encode(k), encode(v)]).sort(([a, b], [c, d]) => a < c ? -1 : a > c ? 1 : b < d ? -1 : b > d ? 1 : 0);
-  const base = ['GET', `${url.origin}${url.pathname}`, params.map(([k, v]) => `${k}=${v}`).join('&')].map(encode).join('&');
+  const params = [...url.searchParams.entries(), ...body.entries(), ...Object.entries(oauth)].map(([k, v]) => [encode(k), encode(v)]).sort(([a, b], [c, d]) => a < c ? -1 : a > c ? 1 : b < d ? -1 : b > d ? 1 : 0);
+  const base = [method, `${url.origin}${url.pathname}`, params.map(([k, v]) => `${k}=${v}`).join('&')].map(encode).join('&');
   oauth.oauth_signature = createHmac('sha1', `${encode(secret)}&`).update(base).digest('base64');
   return `OAuth ${Object.entries(oauth).map(([k, v]) => `${encode(k)}="${encode(v)}"`).join(', ')}`;
 }
@@ -13,7 +13,7 @@ export function authorization(url, key, secret, { nonce = randomBytes(16).toStri
 export function normalizeTrack(track) {
   if (!track.id || !track.title || track.type !== 'song' || !track.uploader?.url_slug || !track.url_slug || track.live === false) return null;
   const path = `${encodeURIComponent(track.uploader.url_slug)}/song/${encodeURIComponent(track.url_slug)}`;
-  return { id: String(track.id), title: track.title, artist: typeof track.artist === 'string' ? track.artist : track.uploader.name, artwork: /^https:\/\//.test(track.image || '') ? track.image : '', type: 'song', url: `https://audiomack.com/${path}`, embedUrl: `https://audiomack.com/embed/${path}` };
+  return { id: String(track.id), title: track.title, artist: typeof track.artist === 'string' ? track.artist : track.uploader.name, artwork: /^https:\/\//.test(track.image || '') ? track.image : '', source: 'audiomack', permalink: `https://audiomack.com/${path}` };
 }
 
 export function createAudiomackMiddleware(env, fetchImpl = fetch) {
@@ -23,11 +23,30 @@ export function createAudiomackMiddleware(env, fetchImpl = fetch) {
   const cache = new Map();
   return async (req, res, next) => {
     const url = new URL(req.url, 'http://localhost');
-    if (!['/api/music/status', '/api/music/search'].includes(url.pathname)) return next();
+    const playMatch = url.pathname.match(/^\/api\/music\/play\/(\d+)$/);
+    if (!playMatch && !['/api/music/status', '/api/music/search'].includes(url.pathname)) return next();
     const send = (status, body) => { res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(body)); };
-    if (req.method !== 'GET') return send(405, { message: 'Only GET is supported.' });
+    if (req.method !== (playMatch ? 'POST' : 'GET')) return send(405, { message: 'Unsupported request method.' });
     if (url.pathname.endsWith('/status')) return send(200, { configured });
     if (!configured) return send(503, { message: 'Audiomack catalog search is not connected yet. The portfolio owner must configure an approved application key and secret on the server.' });
+    if (playMatch) {
+      if (req.headers?.['x-portfolio-player'] !== '1') return send(403, { message: 'Use the portfolio player to start playback.' });
+      const session = url.searchParams.get('session') || '';
+      if (!/^[a-zA-Z0-9-]{16,64}$/.test(session)) return send(400, { message: 'Invalid playback session.' });
+      try {
+        const statsUrl = new URL('https://api.audiomack.com/v1/music/stats/token');
+        statsUrl.search = new URLSearchParams({ music_id: playMatch[1], device: createHash('md5').update(session).digest('hex') });
+        const stats = await fetchImpl(statsUrl, { headers: { Authorization: authorization(statsUrl, key, secret) }, signal: AbortSignal.timeout(10000) });
+        if (!stats.ok) return send(502, { message: 'Audiomack could not authorize this playback session.' });
+        const playUrl = new URL(`https://api.audiomack.com/v1/music/${playMatch[1]}/play`);
+        const body = new URLSearchParams({ session, hq: '1' });
+        const response = await fetchImpl(playUrl, { method: 'POST', body, headers: { Authorization: authorization(playUrl, key, secret, { method: 'POST', body }) }, signal: AbortSignal.timeout(10000) });
+        if (!response.ok) return send(502, { message: 'This song could not be played on Audiomack. Try another result.' });
+        const stream = await response.json();
+        if (typeof stream !== 'string' || !stream.startsWith('https://')) return send(502, { message: 'Audiomack returned an unsupported streaming response.' });
+        return send(200, { url: stream });
+      } catch { return send(502, { message: 'Audiomack playback is unavailable. Please try again.' }); }
+    }
     const query = (url.searchParams.get('q') || '').trim();
     const page = Number(url.searchParams.get('page') || 1);
     if (!query || query.length > 150 || !Number.isInteger(page) || page < 1 || page > 100) return send(400, { message: 'Enter a song or artist name (up to 150 characters).' });

@@ -1,24 +1,21 @@
-# Audiomack music card
+# Search-and-play music card
 
-Audius has been removed. The card uses the official Audiomack embed for song, album, or playlist links. Local device files still support the native line/wave control. Nothing starts automatically on page load.
+The active player uses Audius's public search and streaming API. Type a song or artist, then select a result to play inside the portfolio. There are no pasted links, iframes, automatic artist recommendations, or promotional feeds. It searches the Audius catalog, not the entire Spotify/Audiomack catalog. Some searches return remixes or no matches. Gated, unavailable, and unlisted tracks are excluded. Local device files also work. Nothing starts automatically on page load.
 
-## Connect direct catalog search
+## Controls
 
-Audiomack search requires an approved application's **consumer key and consumer secret**. In the repository root, create a git-ignored `.env.local` with these server-only variables:
+The player starts as a glass circle marked ×. Click it to reveal the compact waveform bar (+); click + to expand search and controls; click − to return to the bar. After seven seconds without pointer, keyboard, form, or wheel activity inside the player, it collapses to the circle. Dragging delays collapse. Music and the queue continue playing while collapsed. A small dot indicates active playback.
 
-```
-AUDIOMACK_CONSUMER_KEY=your_approved_key
-AUDIOMACK_CONSUMER_SECRET=your_approved_secret
-```
+Play/pause, previous/next, seeking, volume, and automatic queue advancement use the native audio element. The wave follows real playback events, including buffering and pause. Browser autoplay restrictions may require a second play gesture, particularly for automatic queue advancement on mobile.
 
-Restart `npm run dev`. Never prefix these variables with `VITE_`, commit them, or put them into the Vue component. The card checks `/api/music/status` and enables catalog search when both variables are configured. Missing credentials are reported honestly; there are no substitute artist feeds or fabricated results.
+Drag only the MUSIC/SOUNDTRACK handle; arrow keys also move it, Shift increases the step, and Home resets its position. Escape minimizes the panel. The artwork is not draggable. Resizing clamps the player to the visible viewport.
 
-`server/audiomack.mjs` signs read-only requests with OAuth 1.0a/HMAC-SHA1. Search requests songs from verified uploaders, supports pagination, and caches bounded results for one minute. Responses only expose display metadata and official embed links, not credentials. Verified uploaders are not a guarantee that every recording is an original or available in every region.
+## Connection and deployment
 
-`vite.config.js` mounts the API middleware in both the development server and `npm run preview`. A static `dist` upload, including GitHub Pages, cannot run these routes. For public deployment, the same middleware needs a Node/serverless backend behind the same-origin `/api/music/*` routes. Live signed search has not been verified against Audiomack without approved credentials; signing, normalization, pagination, and missing-credential behavior have automated tests.
+`src/services/musicCatalog.js` searches `https://api.audius.co/v1/tracks/search` with pagination and an identifying app name. The stream endpoint redirects to the public audio source when playback starts. No private API secrets are shipped. Search requests cancel when the query changes and time out after 15 seconds; service failures are shown in the card. API availability and rate limits remain external dependencies.
 
-Selecting a search result loads its official player inside the card. Playback uses **Audiomack's own controls**. The cross-origin embed has no playback-control/state API documented in the Data API, so the portfolio's line button opens those controls and does not falsely animate as if it can observe embedded playback. For device files, the wave follows actual playing/pause/waiting/ended events.
+The active Audius player can run on static hosting. The existing Audiomack server adapter is retained but is not called by the player. Reactivating it would require authorized consumer credentials stored server-side and a hosted backend. No credentials from Yard were copied or used.
 
-Drag only the MUSIC/SOUNDTRACK handle; arrow keys also move it, Shift increases the step, and Home resets its position. Escape minimizes the card. The artwork is not draggable.
+Tests cover public-track filtering, search encoding, pagination, player state transitions, and the separate Audiomack adapter. Live browser checks confirmed catalog results and playback continuing while the player collapsed.
 
-Reference: [Audiomack Data API documentation](https://audiomack.com/data-api/docs). Its “Non-authenticated request” example still requires a consumer key and secret. The registration endpoint returns user tokens, not application credentials.
+Reference: [Audius developer documentation](https://docs.audius.co/).

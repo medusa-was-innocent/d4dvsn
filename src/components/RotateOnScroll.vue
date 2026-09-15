@@ -16,17 +16,21 @@ let animationFrame = 0;
 let itemHeight = 0;
 let disposed = false;
 let motionQuery;
+let stickyTop = 0;
+let items = [];
+let lastProgress = -1;
 
 const registerContainer = (el) => { contentContainerRef.value = el; };
 const tick = () => {
     animationFrame = 0;
     if (!contentContainerRef.value || !trackRef.value || !itemHeight) return;
-    const stickyTop = parseFloat(getComputedStyle(sceneRef.value).top) || 0;
     const travel = itemHeight * (itemCount.value - 1);
     const progress = Math.min(travel, Math.max(0, stickyTop - trackRef.value.getBoundingClientRect().top));
+    if (progress === lastProgress) return;
+    lastProgress = progress;
     contentContainerRef.value.style.transform = `translate3d(0, ${-progress}px, 0)`;
     activeIndex.value = Math.round(progress / itemHeight);
-    Array.from(contentContainerRef.value.children).forEach((el, index) => {
+    items.forEach((el, index) => {
         const distance = index * itemHeight - progress;
         const rotation = motionQuery?.matches ? 0 : Math.max(-42, Math.min(42, distance / 6));
         el.style.transform = `perspective(1100px) rotateX(${rotation}deg)`;
@@ -37,8 +41,10 @@ const scheduleTick = () => {
 };
 const computeLayout = () => {
     if (disposed || !contentContainerRef.value || !sceneRef.value) return;
-    const items = Array.from(contentContainerRef.value.children);
+    items = Array.from(contentContainerRef.value.children);
     if (!items.length) return;
+    stickyTop = parseFloat(getComputedStyle(sceneRef.value).top) || 0;
+    lastProgress = -1;
     items.forEach(item => { item.style.height = 'auto'; });
     itemHeight = Math.ceil(Math.max(...items.map(item => item.offsetHeight)));
     itemCount.value = items.length;
@@ -52,7 +58,7 @@ onMounted(() => {
     motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     scrollContainer?.addEventListener('scroll', scheduleTick, { passive: true });
     window.addEventListener('resize', computeLayout, { passive: true });
-    motionQuery.addEventListener('change', scheduleTick);
+    motionQuery.addEventListener('change', computeLayout);
     resizeObserver = new ResizeObserver(computeLayout);
     resizeObserver.observe(sceneRef.value);
     computeLayout();
@@ -64,7 +70,7 @@ onBeforeUnmount(() => {
     resizeObserver?.disconnect();
     scrollContainer?.removeEventListener('scroll', scheduleTick);
     window.removeEventListener('resize', computeLayout);
-    motionQuery?.removeEventListener('change', scheduleTick);
+    motionQuery?.removeEventListener('change', computeLayout);
 });
 </script>
 

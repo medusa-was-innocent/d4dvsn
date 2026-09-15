@@ -1,26 +1,28 @@
 export const PAGE_SIZE = 20;
-
-export function parseAudiomackLink(value) {
-  try {
-    const url = new URL(/^https?:\/\//i.test(value) ? value : `https://${value}`);
-    if (!['audiomack.com', 'www.audiomack.com'].includes(url.hostname) || !['https:', 'http:'].includes(url.protocol) || url.username || url.password) return null;
-    const parts = url.pathname.split('/').filter(Boolean);
-    if (parts[0] === 'embed') parts.shift();
-    if (parts.length !== 3) return null;
-    const types = ['song', 'album', 'playlist'];
-    const [artist, type, slug] = types.includes(parts[0]) ? [parts[1], parts[0], parts[2]] : parts;
-    if (!types.includes(type) || !artist || !slug) return null;
-    const path = [artist, type, slug].join('/');
-    return { id: path, title: decodeURIComponent(slug).replaceAll('-', ' '), artist, type, url: `https://audiomack.com/${path}`, embedUrl: `https://audiomack.com/embed/${path}` };
-  } catch { return null; }
+const API = 'https://api.audius.co/v1';
+const APP = 'DevsonPortfolio';
+export function streamUrl(id) {
+  if (typeof id !== 'string' || !/^[a-zA-Z0-9]+$/.test(id)) throw new Error('Invalid track. Please choose another song.');
+  return `${API}/tracks/${id}/stream?app_name=${APP}`;
 }
-
+export function normalizePublicTrack(track) {
+  if (!track || typeof track.id !== 'string' || !/^[a-zA-Z0-9]+$/.test(track.id) || !track.title ||
+      track.is_available === false || track.is_delete || track.is_unlisted ||
+      track.is_stream_gated || track.stream_conditions || track.access?.stream === false) return null;
+  const artwork = track.artwork?.['480x480'] || track.artwork?.['150x150'];
+  return {
+    id: track.id, title: track.title, artist: track.user?.name || 'Unknown artist',
+    source: 'audius', artwork: artwork?.startsWith('https://') ? artwork : '',
+    duration: Number(track.duration) || 0, url: streamUrl(track.id),
+  };
+}
 export async function searchTracks(query, { offset = 0, signal } = {}) {
-  const params = new URLSearchParams({ q: query, page: String(Math.floor(offset / PAGE_SIZE) + 1) });
-  const response = await fetch(`/api/music/search?${params}`, { signal });
-  if (!(response.headers.get('content-type') || '').includes('application/json')) throw new Error('Audiomack search needs the portfolio’s server. Static hosting alone cannot run catalog search.');
+  const term = query.trim().slice(0, 150);
+  if (!term) return { tracks: [], hasMore: false };
+  const params = new URLSearchParams({ query: term, offset: String(offset), limit: String(PAGE_SIZE), app_name: APP });
+  const response = await fetch(`${API}/tracks/search?${params}`, { signal });
+  if (!response.ok) throw new Error(response.status === 429 ? 'Music search is busy. Please try again shortly.' : 'Music search is unavailable. Please try again.');
   const body = await response.json();
-  if (!response.ok) throw new Error(body.message || 'Audiomack search is unavailable.');
-  if (!Array.isArray(body.tracks)) throw new Error('Unexpected search response. Please try again.');
-  return { tracks: body.tracks.filter(track => parseAudiomackLink(track.url)), hasMore: Boolean(body.hasMore) };
+  if (!Array.isArray(body.data)) throw new Error('Unexpected search response. Please try again.');
+  return { tracks: body.data.map(normalizePublicTrack).filter(Boolean), hasMore: body.data.length === PAGE_SIZE };
 }

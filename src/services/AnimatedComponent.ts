@@ -19,6 +19,8 @@ export class AnimatedComponent {
     public disableAnimations: () => void = () => { };
     public prepareForAnimations: () => void = () => { };
     public tick: (e?: Event | number) => void = () => { };
+    private pendingFrame = 0;
+    private latestEvent?: Event;
 
     /**
      * @param domSection The section / container that must be visible to enable the animation
@@ -32,6 +34,9 @@ export class AnimatedComponent {
      * Reset the instance to default values
      */
     public reset(): void {
+        cancelAnimationFrame(this.pendingFrame);
+        this.pendingFrame = 0;
+        this.latestEvent = undefined;
         this.areAnimationsEnabled = false;
         this.enableAnimations = ()=>{};
         this.disableAnimations = ()=>{};
@@ -44,6 +49,15 @@ export class AnimatedComponent {
      * Compute and run the animation
      */
     public animate(e?: Event): void {
+        this.latestEvent = e;
+        if (this.pendingFrame) return;
+        this.pendingFrame = requestAnimationFrame(() => {
+            this.pendingFrame = 0;
+            this.runFrame(this.latestEvent);
+        });
+    }
+
+    private runFrame(e?: Event): void {
         // Ensure that the animation is visible
         if (!this.isVisibleOnScreen()) {
             if (this.areAnimationsEnabled) this.toggleAnimationStatus();
@@ -55,11 +69,12 @@ export class AnimatedComponent {
         this.prepareForAnimations();
 
         // Delegate the animation sync to the browser
-        e ? requestAnimationFrame(() => this.tick(e)) : requestAnimationFrame(this.tick);
+        this.tick(e);
     }
 
     public autoAnimate(): void {
-        AutoAnimations.getInstance().addAnimation(this.id, this.animate.bind(this))
+        // AutoAnimations already runs inside the browser's animation frame.
+        AutoAnimations.getInstance().addAnimation(this.id, () => this.runFrame())
     }
 
     /**
@@ -86,8 +101,10 @@ export class AnimatedComponent {
     public isVisibleOnScreen(): boolean {
         if (!this.domSection) return true
 
-        const isAboveScreen = this.domSection.getBoundingClientRect().bottom < 0;
-        const isBelowScreen = this.domSection.getBoundingClientRect().top - window.innerHeight > 0
+        const bounds = this.domSection.getBoundingClientRect();
+        // Prepare just before entry so the first visible frame is already correct.
+        const isAboveScreen = bounds.bottom < -100;
+        const isBelowScreen = bounds.top > window.innerHeight + 100;
         return !isAboveScreen && !isBelowScreen
     }
 
